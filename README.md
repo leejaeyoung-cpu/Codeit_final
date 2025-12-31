@@ -125,31 +125,31 @@
 │       AI Processing Pipeline        │
 │                                     │
 │  ┌──────────────────────────────┐  │
-│  │  1. Image Preprocessing      │  │ ← 내 담당
+│  │  1. Image Preprocessing      │  │ 
 │  │     - Resize (1024x1024)     │  │
 │  │     - Quality Check          │  │
 │  └──────────┬───────────────────┘  │
 │             │                       │
 │  ┌──────────▼───────────────────┐  │
-│  │  2. Background Removal       │  │ ← 내 담당
+│  │  2. Background Removal       │  │ 
 │  │     - RMBG-2.0 Model         │  │
 │  │     - Edge Smoothing         │  │
 │  └──────────┬───────────────────┘  │
 │             │                       │
 │  ┌──────────▼───────────────────┐  │
-│  │  3. Style Processing         │  │ ← 내 담당
+│  │  3. Style Processing         │  │ 
 │  │     - Minimal Style          │  │
 │  │     - Mood Style             │  │
 │  │     - Street Style           │  │
 │  └──────────┬───────────────────┘  │
 │             │                       │
 │  ┌──────────▼───────────────────┐  │
-│  │  4. Background Generation    │  │ ← 타팀 담당
+│  │  4. Background Generation    │  │ 
 │  │     - Stable Diffusion XL    │  │
 │  └──────────┬───────────────────┘  │
 │             │                       │
 │  ┌──────────▼───────────────────┐  │
-│  │  5. Post-processing          │  │ ← 내 담당
+│  │  5. Post-processing          │  │ 
 │  │     - Instagram Format       │  │
 │  │     - Compression            │  │
 │  └──────────────────────────────┘  │
