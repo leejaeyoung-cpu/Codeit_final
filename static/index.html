@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>배경 제거 - AdGen AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 30px;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .option-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        select, input[type="color"] {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        select:focus, input[type="color"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .color-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="color"] {
+            width: 60px;
+            height: 45px;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result-area {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .result-area.show {
+            display: block;
+        }
+
+        .image-preview {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .preview-box {
+            text-align: center;
+        }
+
+        .preview-box h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .preview-box img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            background: 
+                linear-gradient(45deg, #ccc 25%, transparent 25%),
+                linear-gradient(-45deg, #ccc 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #ccc 75%),
+                linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .download-btn {
+            background: #4caf50;
+            padding: 10px 30px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .download-btn:hover {
+            box-shadow: 0 10px 25px rgba(76, 175, 80, 0.4);
+        }
+
+        .info {
+            background: #f0f1ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #555;
+        }
+
+        @media (max-width: 768px) {
+            .options {
+                grid-template-columns: 1fr;
+            }
+
+            .image-preview {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 AI 배경 제거</h1>
+        <p class="subtitle">인스타그램 광고용 이미지를 간편하게 제작하세요</p>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📤</div>
+            <h3>이미지를 드래그하거나 클릭하여 업로드</h3>
+            <p style="color: #999; margin-top: 10px;">JPG, PNG 지원</p>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div class="options">
+            <div class="option-group">
+                <label>인스타그램 비율</label>
+                <select id="ratioSelect">
+                    <option value="4:5">4:5 (세로형 - 1080x1350)</option>
+                    <option value="1:1">1:1 (정사각형 - 1080x1080)</option>
+                    <option value="16:9">16:9 (가로형 - 1080x566)</option>
+                </select>
+            </div>
+
+            <div class="option-group">
+                <label>배경색 (선택)</label>
+                <div class="color-option">
+                    <input type="checkbox" id="useBackground">
+                    <input type="color" id="bgColor" value="#FFFFFF" disabled>
+                    <span id="bgLabel">투명 배경</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn" id="processBtn" disabled>배경 제거하기</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>처리 중입니다... 잠시만 기다려주세요</p>
+        </div>
+
+        <div class="result-area" id="resultArea">
+            <h2 style="margin-bottom: 20px; color: #333;">✨ 처리 결과</h2>
+            
+            <div class="image-preview">
+                <div class="preview-box">
+                    <h3>원본 이미지</h3>
+                    <img id="originalImg" alt="원본">
+                </div>
+                <div class="preview-box">
+                    <h3>처리된 이미지</h3>
+                    <img id="resultImg" alt="결과">
+                    <button class="btn download-btn" id="downloadBtn">다운로드</button>
+                </div>
+            </div>
+
+            <div class="info" id="infoBox"></div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const loading = document.getElementById('loading');
+        const resultArea = document.getElementById('resultArea');
+        const originalImg = document.getElementById('originalImg');
+        const resultImg = document.getElementById('resultImg');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const infoBox = document.getElementById('infoBox');
+        const ratioSelect = document.getElementById('ratioSelect');
+        const useBackground = document.getElementById('useBackground');
+        const bgColor = document.getElementById('bgColor');
+        const bgLabel = document.getElementById('bgLabel');
+
+        let selectedFile = null;
+        let resultBlob = null;
+
+        // 파일 업로드 영역 클릭
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // 파일 선택
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        // 드래그 앤 드롭
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        // 배경색 체크박스
+        useBackground.addEventListener('change', (e) => {
+            bgColor.disabled = !e.target.checked;
+            bgLabel.textContent = e.target.checked ? '배경색 사용' : '투명 배경';
+        });
+
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                alert('이미지 파일만 업로드 가능합니다.');
+                return;
+            }
+
+            selectedFile = file;
+            processBtn.disabled = false;
+            
+            // 원본 이미지 미리보기
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalImg.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            uploadArea.innerHTML = `
+                <div class="upload-icon">✅</div>
+                <h3>${file.name}</h3>
+                <p style="color: #999; margin-top: 10px;">${(file.size / 1024).toFixed(1)} KB</p>
+            `;
+        }
+
+        // 배경 제거 처리
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('ratio', ratioSelect.value);
+            
+            if (useBackground.checked) {
+                formData.append('background_color', bgColor.value);
+            }
+
+            processBtn.disabled = true;
+            loading.classList.add('show');
+            resultArea.classList.remove('show');
+
+            try {
+                const startTime = Date.now();
+                const response = await fetch('http://127.0.0.1:8000/api/v1/remove-background', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('처리 실패: ' + response.statusText);
+                }
+
+                const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                resultBlob = await response.blob();
+
+                // 결과 이미지 표시
+                const resultUrl = URL.createObjectURL(resultBlob);
+                resultImg.src = resultUrl;
+
+                // 정보 표시
+                const fileSize = (resultBlob.size / 1024).toFixed(1);
+                const format = useBackground.checked ? 'JPEG' : 'PNG';
+                infoBox.innerHTML = `
+                    ⏱️ 처리 시간: ${processingTime}초<br>
+                    📏 비율: ${ratioSelect.value}<br>
+                    📦 파일 크기: ${fileSize} KB<br>
+                    🎨 포맷: ${format}
+                `;
+
+                resultArea.classList.add('show');
+            } catch (error) {
+                alert('오류가 발생했습니다: ' + error.message);
+                console.error(error);
+            } finally {
+                loading.classList.remove('show');
+                processBtn.disabled = false;
+            }
+        });
+
+        // 다운로드
+        downloadBtn.addEventListener('click', () => {
+            if (!resultBlob) return;
+
+            const url = URL.createObjectURL(resultBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const ext = useBackground.checked ? 'jpg' : 'png';
+            const ratio = ratioSelect.value.replace(':', '_');
+            a.download = `background_removed_${ratio}.${ext}`;
+            
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>

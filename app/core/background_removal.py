@@ -1,38 +1,51 @@
 """
-Background Removal Service
-Uses RMBG-2.0 model for automatic background removal
+Background Removal Service using rembg
+Fallback implementation that doesn't require Hugging Face authentication
 """
-from typing import Optional
+from typing import List
 from PIL import Image
-import numpy as np
+import logging
+from rembg import remove
+
+logger = logging.getLogger(__name__)
+
 
 class BackgroundRemovalService:
-    """Service for AI-powered background removal"""
+    """Service for AI-powered background removal using rembg"""
     
     def __init__(self):
-        """Initialize the background removal model"""
-        # TODO: Load RMBG-2.0 model
-        self.model = None
+        """Initialize the background removal service"""
+        logger.info("Initializing rembg background removal service")
+        self.model_name = "rembg (u2net)"
     
     async def remove_background(self, image: Image.Image) -> Image.Image:
         """
-        Remove background from image
+        Remove background from image using rembg
         
         Args:
-            image: Input PIL Image
+            image: Input PIL Image (RGB)
             
         Returns:
-            Image with background removed
+            Image with background removed (RGBA with transparent background)
         """
-        # TODO: Implement background removal
-        # 1. Preprocess image
-        # 2. Run RMBG-2.0 model
-        # 3. Post-process (edge smoothing)
-        # 4. Return result
-        
-        return image
+        try:
+            # Convert to RGB if necessary
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            original_size = image.size
+            
+            # Run rembg
+            result = remove(image)
+            
+            logger.info(f"Background removed successfully for image size: {original_size}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error removing background: {e}")
+            raise
     
-    async def batch_remove_background(self, images: list[Image.Image]) -> list[Image.Image]:
+    async def batch_remove_background(self, images: List[Image.Image]) -> List[Image.Image]:
         """
         Remove background from multiple images
         
@@ -42,9 +55,15 @@ class BackgroundRemovalService:
         Returns:
             List of images with backgrounds removed
         """
-        # TODO: Implement batch processing
         results = []
-        for image in images:
-            result = await self.remove_background(image)
-            results.append(result)
+        for idx, image in enumerate(images):
+            try:
+                result = await self.remove_background(image)
+                results.append(result)
+                logger.info(f"Processed image {idx + 1}/{len(images)}")
+            except Exception as e:
+                logger.error(f"Error processing image {idx + 1}: {e}")
+                # Return original image on error
+                results.append(image)
+        
         return results

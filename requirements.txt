@@ -6,10 +6,16 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 
 # Image Processing
-rembg==2.0.53
+rembg>=2.0.0
 opencv-python==4.8.1.78
 Pillow==10.1.0
 numpy==1.24.3
+
+# Deep Learning (RMBG-2.0)
+torch==2.1.2
+torchvision==0.16.2
+transformers==4.36.2
+kornia==0.7.1
 
 # Async & Task Queue
 celery==5.3.4
