@@ -364,11 +364,50 @@ Codeit_final/
 - [x] **API 검증 및 테스트 완료**
 - [ ] Cloud Storage 연동 (예정)
 
-### ⏳ Week 2 (2026-01-06 ~ 2026-01-12)
-- [ ] 색감 보정 알고리즘 구현
-- [ ] 의류 주름 정리 로직
-- [ ] 3가지 스타일별 전처리 분기 구현
-- [ ] 처리 속도 최적화 (목표: 5초 이내)
+### ✅ Week 2 (2026-01-06 ~ 2026-01-12) - 조기 달성!
+- [x] **색감 보정 알고리즘 구현** (자동 화이트밸런스, CLAHE)
+- [x] **의류 주름 정리 로직** (Bilateral/Guided Filter)
+- [x] **3가지 스타일별 전처리 분기** (Minimal, Mood, Street)
+- [x] **Next.js + TypeScript 프론트엔드 통합**
+- [x] 처리 속도 최적화 (목표: 5초 이내 달성)
+
+---
+
+## 🎨 고급 이미지 처리 기능 (Week 2)
+
+### 1. 색감 보정 (Color Correction)
+- **자동 화이트 밸런스**: Gray World 알고리즘으로 정확한 색온도 보정
+- **CLAHE**: 적응형 히스토그램 평활화로 디테일과 대비 향상
+- **채도/선명도**: 스타일별 최적화된 파라미터 적용
+
+### 2. 의류 주름 정리 (Wrinkle Removal)
+- **스마트 스무딩**: 옷감의 질감은 유지하면서 불필요한 주름만 제거
+- **알고리즘**: Bilateral Filter 및 Guided Filter 조합 사용
+- **강도 조절**: Light, Medium, Strong 옵션 제공
+
+### 3. 스타일 프로세싱 (Style Processing)
+| 스타일 | 특징 | 용도 |
+|-------|------|------|
+| **Minimal** | 화이트 배경, 고대비, 프로페셔널 섀도우 | 깔끔한 제품 상세 페이지 |
+| **Mood** | 따뜻한 색감, 빈티지 필터, 파스텔 배경 | 감성적인 인스타그램 피드 |
+| **Street** | 높은 채도, 강한 대비, 쿨톤, 비비드 | 트렌디한 스트릿 패션 광고 |
+
+---
+
+## 💻 프론트엔드 통합 (Next.js + TypeScript)
+
+백엔드 API와 완벽하게 연동되는 Next.js 프론트엔드 코드가 준비되었습니다.
+
+### 주요 기능
+- **TypeScript**: 완전한 타입 안전성 보장 (`types/api.ts`)
+- **Custom Hooks**: `useImageProcessing` 훅으로 상태 관리 단순화
+- **UI 컴포넌트**:
+  - `ImageUploader`: 드래그 앤 드롭 지원
+  - `StyleSelector`: 3가지 스타일 직관적 선택
+  - `ResultDisplay`: 원본/결과 비교 및 다운로드
+
+### 통합 가이드
+상세한 통합 방법은 [`nextjs_frontend_guide.md`](nextjs_frontend_guide.md) 문서를 참조하세요.
 
 ### ⏳ Week 3 (2026-01-13 ~ 2026-01-19)
 - [ ] 배치 처리 기능 구현
