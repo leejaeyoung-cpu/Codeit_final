@@ -1,113 +1,54 @@
 """
 RMBG-2.0 Background Removal Service
-Uses briaai/RMBG-2.0 model from Hugging Face for superior background removal
+Uses Hugging Face Inference API for briaai/RMBG-2.0 model
 """
 from typing import List, Optional
 from PIL import Image
-import torch
-import numpy as np
+import io
+import os
 import logging
-from transformers import AutoModelForImageSegmentation
-from torchvision import transforms
-import asyncio
-from functools import lru_cache
+from huggingface_hub import InferenceClient
 
 logger = logging.getLogger(__name__)
 
 
 class BackgroundRemovalServiceRMBG:
-    """Service for AI-powered background removal using RMBG-2.0"""
+    """Service for AI-powered background removal using RMBG-2.0 via Inference API"""
     
-    def __init__(self, device: str = "auto"):
+    def __init__(self, device: str = "auto", api_key: Optional[str] = None):
         """
-        Initialize the RMBG-2.0 background removal service
+        Initialize the RMBG-2.0 background removal service using Hugging Face Inference API
         
         Args:
-            device: Device to use ("cuda", "cpu", or "auto")
+            device: Ignored for API-based inference (kept for compatibility)
+            api_key: Hugging Face API token (will use HF_TOKEN env var if not provided)
         """
-        logger.info("Initializing RMBG-2.0 background removal service")
+        logger.info("Initializing RMBG-2.0 background removal service (Inference API)")
         
-        # Determine device
-        if device == "auto":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
-            
-        logger.info(f"Using device: {self.device}")
+        self.model_name = "briaai/RMBG-2.0"
         
-        # Load model
+        # Get API key from parameter or environment
+        self.api_key = api_key or os.environ.get("HF_TOKEN")
+        
+        if not self.api_key:
+            logger.warning("HF_TOKEN not found. RMBG-2.0 may require authentication.")
+            logger.warning("Set HF_TOKEN environment variable or pass api_key parameter.")
+        
         try:
-            self.model_name = "briaai/RMBG-2.0"
-            logger.info(f"Loading model: {self.model_name}")
-            
-            self.model = AutoModelForImageSegmentation.from_pretrained(
-                self.model_name,
-                trust_remote_code=True
+            # Initialize Hugging Face Inference Client
+            self.client = InferenceClient(
+                provider="fal-ai",
+                api_key=self.api_key,
             )
-            self.model.to(self.device)
-            self.model.eval()
-            
-            logger.info("RMBG-2.0 model loaded successfully")
-            
-            # Define image transforms
-            self.transform_image = transforms.Compose([
-                transforms.Resize((1024, 1024)),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ])
+            logger.info("RMBG-2.0 Inference API client initialized successfully")
             
         except Exception as e:
-            logger.error(f"Error loading RMBG-2.0 model: {e}")
+            logger.error(f"Error initializing RMBG-2.0 Inference API: {e}")
             raise
-    
-    def preprocess_image(self, image: Image.Image) -> torch.Tensor:
-        """
-        Preprocess image for RMBG-2.0 model
-        
-        Args:
-            image: Input PIL Image (RGB)
-            
-        Returns:
-            Preprocessed tensor
-        """
-        # Convert to RGB if necessary
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Apply transforms
-        input_tensor = self.transform_image(image)
-        input_batch = input_tensor.unsqueeze(0).to(self.device)
-        
-        return input_batch, image.size
-    
-    def postprocess_mask(self, mask: torch.Tensor, original_size: tuple) -> Image.Image:
-        """
-        Postprocess model output to create alpha mask
-        
-        Args:
-            mask: Model output tensor
-            original_size: Original image size (width, height)
-            
-        Returns:
-            PIL Image (L mode) with alpha mask
-        """
-        # Convert to numpy
-        mask_np = mask.squeeze().cpu().numpy()
-        
-        # Normalize to 0-255 (256 levels of transparency)
-        mask_np = (mask_np * 255).astype(np.uint8)
-        
-        # Create PIL image
-        mask_img = Image.fromarray(mask_np, mode='L')
-        
-        # Resize to original size
-        mask_img = mask_img.resize(original_size, Image.Resampling.LANCZOS)
-        
-        return mask_img
     
     async def remove_background(self, image: Image.Image) -> Image.Image:
         """
-        Remove background from image using RMBG-2.0
+        Remove background from image using RMBG-2.0 Inference API
         
         Args:
             image: Input PIL Image (RGB)
@@ -117,31 +58,50 @@ class BackgroundRemovalServiceRMBG:
         """
         try:
             original_size = image.size
-            logger.info(f"Processing image with RMBG-2.0: size={original_size}")
+            logger.info(f"Processing image with RMBG-2.0 API: size={original_size}")
             
-            # Preprocess
-            input_batch, orig_size = self.preprocess_image(image)
+            # Convert to RGB if necessary
+            if image.mode not in ['RGB', 'RGBA']:
+                image = image.convert('RGB')
             
-            # Run inference
-            with torch.no_grad():
-                output = self.model(input_batch)[-1].sigmoid()
+            # Save image to bytes
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
             
-            # Postprocess mask
-            mask = self.postprocess_mask(output, original_size)
-            
-            # Convert original to RGBA
-            if image.mode != 'RGBA':
-                image = image.convert('RGBA')
-            
-            # Apply mask
-            result = image.copy()
-            result.putalpha(mask)
-            
-            logger.info(f"Background removed successfully with RMBG-2.0")
-            return result
+            # Call Inference API
+            try:
+                # InferenceClient.image_segmentation returns the result image
+                result = self.client.image_segmentation(
+                    img_byte_arr,
+                    model=self.model_name
+                )
+                
+                # Result should be a PIL Image with transparent background
+                if isinstance(result, Image.Image):
+                    output_image = result
+                else:
+                    # If result is bytes, convert to PIL Image
+                    output_image = Image.open(io.BytesIO(result))
+                
+                # Ensure RGBA mode
+                if output_image.mode != 'RGBA':
+                    output_image = output_image.convert('RGBA')
+                
+                # Resize to original size if different
+                if output_image.size != original_size:
+                    output_image = output_image.resize(original_size, Image.Resampling.LANCZOS)
+                
+                logger.info(f"Background removed successfully with RMBG-2.0 API")
+                return output_image
+                
+            except Exception as api_error:
+                logger.error(f"Inference API call failed: {api_error}")
+                logger.error("This may be due to missing HF_TOKEN or model access restrictions")
+                raise
             
         except Exception as e:
-            logger.error(f"Error removing background with RMBG-2.0: {e}")
+            logger.error(f"Error removing background with RMBG-2.0 API: {e}")
             raise
     
     async def batch_remove_background(self, images: List[Image.Image]) -> List[Image.Image]:
@@ -171,7 +131,8 @@ class BackgroundRemovalServiceRMBG:
         """Get model information"""
         return {
             "model_name": self.model_name,
-            "device": self.device,
-            "gpu_available": torch.cuda.is_available(),
-            "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+            "device": "api",  # Using Inference API
+            "api_provider": "fal-ai",
+            "gpu_available": True,  # API uses GPU
+            "has_token": bool(self.api_key)
         }
