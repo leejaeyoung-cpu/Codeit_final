@@ -11,12 +11,14 @@ import logging
 from typing import Optional
 
 from app.core.background_removal import BackgroundRemovalService
+from app.core.background_removal_rmbg import BackgroundRemovalServiceRMBG
 from app.core.image_processing import (
     resize_to_instagram_ratio,
     add_background_color,
     get_image_info
 )
 from app.core.style_processor import StyleProcessor
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +26,41 @@ router = APIRouter()
 
 # Initialize services (singleton)
 bg_removal_service = None
+bg_removal_service_rmbg = None
 style_processor = None
 
 
-def get_bg_removal_service() -> BackgroundRemovalService:
-    """Get or create background removal service instance"""
-    global bg_removal_service
+def get_bg_removal_service():
+    """
+    Get or create background removal service instance
+    
+    Returns appropriate service based on configuration:
+    - RMBG-2.0 if configured and available
+    - Falls back to rembg (U2-Net) on error or if configured
+    """
+    global bg_removal_service, bg_removal_service_rmbg
+    
+    # Check configuration
+    if settings.bg_removal_model == "rmbg-2.0":
+        try:
+            if bg_removal_service_rmbg is None:
+                logger.info("Initializing RMBG-2.0 BackgroundRemovalService...")
+                bg_removal_service_rmbg = BackgroundRemovalServiceRMBG(
+                    device=settings.bg_removal_device
+                )
+            return bg_removal_service_rmbg, "rmbg-2.0"
+        except Exception as e:
+            logger.error(f"Failed to initialize RMBG-2.0: {e}")
+            if not settings.bg_removal_fallback:
+                raise
+            logger.info("Falling back to rembg (U2-Net)")
+    
+    # Use rembg as default or fallback
     if bg_removal_service is None:
-        logger.info("Initializing BackgroundRemovalService...")
+        logger.info("Initializing rembg (U2-Net) BackgroundRemovalService...")
         bg_removal_service = BackgroundRemovalService()
-    return bg_removal_service
+    
+    return bg_removal_service, "u2net"
 
 
 def get_style_processor() -> StyleProcessor:
@@ -80,7 +107,8 @@ async def remove_background(
         logger.info(f"Options: ratio={ratio}, style={style}, enhance_color={enhance_color}, remove_wrinkles={remove_wrinkles}")
         
         # Get services
-        bg_service = get_bg_removal_service()
+        bg_service, model_name = get_bg_removal_service()
+        logger.info(f"Using background removal model: {model_name}")
         
         # 1. Remove background
         step_start = time.time()
@@ -130,6 +158,7 @@ async def remove_background(
             headers={
                 "X-Processing-Time": str(processing_time),
                 "X-Processing-Style": style,
+                "X-Model-Used": model_name,
                 "X-Output-Format": output_format,
                 "X-Timing-Background": str(timing.get('background_removal', 0)),
                 "X-Timing-Style": str(timing.get('style_processing', 0)),
@@ -172,12 +201,22 @@ async def get_image_metadata(file: UploadFile = File(...)):
 async def health_check():
     """Health check endpoint for image processing service"""
     try:
-        service = get_bg_removal_service()
-        return {
+        service, model_name = get_bg_removal_service()
+        
+        health_info = {
             "status": "healthy",
+            "model_name": model_name,
             "model_loaded": True,
             "styles_available": ["minimal", "mood", "street"]
         }
+        
+        # Add GPU info if using RMBG-2.0
+        if model_name == "rmbg-2.0" and hasattr(service, 'get_model_info'):
+            model_info = service.get_model_info()
+            health_info.update(model_info)
+        
+        return health_info
+        
     except Exception as e:
         return {
             "status": "unhealthy",

@@ -16,6 +16,8 @@ torch==2.1.2
 torchvision==0.16.2
 transformers==4.36.2
 kornia==0.7.1
+huggingface-hub>=0.20.0
+accelerate>=0.25.0
 
 # Async & Task Queue
 celery==5.3.4
