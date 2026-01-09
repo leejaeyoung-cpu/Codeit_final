@@ -64,9 +64,8 @@ temp/
 *.gif
 !docs/images/*
 
-# Models
-models/*.pth
-models/*.onnx
+# Models (exclude downloaded models)
+models/
 !models/.gitkeep
 
 # Database

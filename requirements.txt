@@ -18,6 +18,7 @@ transformers==4.36.2
 kornia==0.7.1
 huggingface-hub>=0.20.0
 accelerate>=0.25.0
+timm>=1.0.0  # For RMBG-2.0 BiRefNet architecture
 
 # Async & Task Queue
 celery==5.3.4

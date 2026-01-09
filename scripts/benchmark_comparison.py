@@ -156,16 +156,47 @@ async def save_comparison_images(results_u2net: List, results_rmbg: List, output
     print(f"  ✓ Saved {len(results_u2net)} comparison images")
 
 
+from app.api.v1.image import get_bg_removal_service
+from app.config import settings
+
+# ... (imports)
+
+def load_test_images(image_dir: Path = None) -> List[Image.Image]:
+    """Load real test images if available, otherwise create synthetic ones"""
+    images = []
+    
+    if image_dir and image_dir.exists():
+        print(f"Loading images from {image_dir}...")
+        for ext in ['*.jpg', '*.jpeg', '*.png']:
+            for img_path in image_dir.glob(ext):
+                try:
+                    img = Image.open(img_path).convert('RGB')
+                    # Resize if too large for faster testing
+                    if max(img.size) > 1500:
+                        img.thumbnail((1500, 1500))
+                    images.append(img)
+                    print(f"  Loaded: {img_path.name} ({img.size})")
+                except Exception as e:
+                    print(f"  Failed to load {img_path}: {e}")
+    
+    if not images:
+        print("No real images found. Creating synthetic test images...")
+        return create_test_images(num_images=5)
+        
+    return images
+
 async def main():
     """Main benchmark function"""
     print("="*80)
     print("RMBG-2.0 vs U2-Net Performance Benchmark")
     print("="*80)
     
-    # Create test images
-    print("\n📸 Creating test images...")
-    test_images = create_test_images(num_images=5)
-    print(f"  Created {len(test_images)} test images")
+    # Create/Load test images
+    print("\n📸 Preparing test images...")
+    # Check for real images in 'test_images' folder
+    test_image_dir = Path(__file__).parent.parent / "test_images"
+    test_images = load_test_images(test_image_dir)
+    print(f"  Total images: {len(test_images)}")
     
     # Initialize services
     print("\n🔧 Initializing services...")
@@ -180,22 +211,25 @@ async def main():
     
     try:
         print("  - Loading RMBG-2.0...")
-        service_rmbg = BackgroundRemovalServiceRMBG(device="auto")
+        # Force RMBG-2.0 configuration for this test
+        settings.bg_removal_model = "rmbg-2.0"
+        service_rmbg, model_type = get_bg_removal_service()
         
-        # Get model info
-        info = service_rmbg.get_model_info()
-        print(f"    ✓ RMBG-2.0 loaded")
-        print(f"    - Device: {info['device']}")
-        if info.get('gpu_available'):
-            print(f"    - GPU: {info.get('gpu_name', 'Unknown')}")
+        print(f"    ✓ RMBG-2.0 loaded ({model_type})")
+        
+        if hasattr(service_rmbg, 'get_model_info'):
+            info = service_rmbg.get_model_info()
+            print(f"    - Device: {info.get('device', 'unknown')}")
+            if info.get('gpu_available'):
+                print(f"    - GPU: {info.get('gpu_name', 'Available')}")
+                
     except Exception as e:
         print(f"    ✗ Failed to load RMBG-2.0: {e}")
-        print(f"    This might be due to missing dependencies or model download issues")
         return
     
     # Run benchmarks
     stats_u2net, results_u2net = await benchmark_model(service_u2net, test_images, "U2-Net (rembg)")
-    stats_rmbg, results_rmbg = await benchmark_model(service_rmbg, test_images, "RMBG-2.0")
+    stats_rmbg, results_rmbg = await benchmark_model(service_rmbg, test_images, f"RMBG-2.0 ({model_type})")
     
     # Print comparison
     print_comparison(stats_u2net, stats_rmbg)

@@ -1,0 +1,36 @@
+{
+  "u2net": {
+    "model_name": "U2-Net (rembg)",
+    "total_images": 5,
+    "successful": 5,
+    "failed": 0,
+    "avg_time": 2.157399845123291,
+    "min_time": 1.719374418258667,
+    "max_time": 2.4994239807128906,
+    "std_time": 0.25336527907443657,
+    "times": [
+      2.262314558029175,
+      2.1297459602355957,
+      1.719374418258667,
+      2.176140308380127,
+      2.4994239807128906
+    ]
+  },
+  "rmbg2": {
+    "model_name": "RMBG-2.0 (rmbg-2.0-api)",
+    "total_images": 5,
+    "successful": 0,
+    "failed": 5,
+    "avg_time": null,
+    "min_time": null,
+    "max_time": null,
+    "std_time": null,
+    "times": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  }
+}

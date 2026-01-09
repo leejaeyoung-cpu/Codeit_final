@@ -37,8 +37,8 @@ class BackgroundRemovalServiceRMBG:
         try:
             # Initialize Hugging Face Inference Client
             self.client = InferenceClient(
-                provider="fal-ai",
-                api_key=self.api_key,
+                provider="hf-inference",
+                token=self.api_key,
             )
             logger.info("RMBG-2.0 Inference API client initialized successfully")
             
@@ -73,7 +73,7 @@ class BackgroundRemovalServiceRMBG:
             try:
                 # InferenceClient.image_segmentation returns the result image
                 result = self.client.image_segmentation(
-                    img_byte_arr,
+                    img_byte_arr.getvalue(),
                     model=self.model_name
                 )
                 
@@ -132,7 +132,7 @@ class BackgroundRemovalServiceRMBG:
         return {
             "model_name": self.model_name,
             "device": "api",  # Using Inference API
-            "api_provider": "fal-ai",
+            "api_provider": "huggingface",
             "gpu_available": True,  # API uses GPU
             "has_token": bool(self.api_key)
         }

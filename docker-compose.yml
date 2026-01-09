@@ -5,14 +5,17 @@ services:
   api:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - ENVIRONMENT=development
+      - ENVIRONMENT=production
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/adgen_db
       - REDIS_HOST=redis
       - CELERY_BROKER_URL=redis://redis:6379/0
+      - BG_REMOVAL_MODEL=rmbg-2.0
+      - BG_REMOVAL_USE_LOCAL_MODEL=false
+      - HF_TOKEN=${HF_TOKEN} # Pass from host environment
     volumes:
       - ./app:/app/app
       - ./uploads:/app/uploads
@@ -25,12 +28,13 @@ services:
   worker:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
     environment:
-      - ENVIRONMENT=development
+      - ENVIRONMENT=production
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/adgen_db
       - REDIS_HOST=redis
       - CELERY_BROKER_URL=redis://redis:6379/0
+      - HF_TOKEN=${HF_TOKEN}
     volumes:
       - ./app:/app/app
       - ./uploads:/app/uploads
