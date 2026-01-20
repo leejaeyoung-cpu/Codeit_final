@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     
     # Pipeline Settings
     pipeline_enabled: bool = True  # Enable new pipeline architecture
-    pipeline_default_model: str = "u2net"  # Options: "u2net", "rmbg-2.0-local", "rmbg-2.0-api"
+    pipeline_default_model: str = "rmbg-2.0-local"  # Options: "u2net", "rmbg-2.0-local", "rmbg-2.0-api"
     pipeline_fallback_enabled: bool = True  # Enable fallback to other models
     pipeline_fallback_chain: str = "rmbg-2.0-local,rmbg-2.0-api,u2net"  # Comma-separated fallback order
     pipeline_batch_size: int = 10  # Batch processing size
