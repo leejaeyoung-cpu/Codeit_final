@@ -35,8 +35,15 @@ class BackgroundRemovalService:
             
             original_size = image.size
             
-            # Run rembg
-            result = remove(image)
+            # Run rembg with enhanced post-processing
+            result = remove(
+                image,
+                alpha_matting=True,  # Enable alpha matting for better edges
+                alpha_matting_foreground_threshold=240,
+                alpha_matting_background_threshold=10,
+                alpha_matting_erode_size=10,
+                post_process_mask=True  # Enable mask refinement
+            )
             
             logger.info(f"Background removed successfully for image size: {original_size}")
             return result
