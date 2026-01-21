@@ -22,6 +22,10 @@ from app.core.style_processor import StyleProcessor
 from app.core.storage import storage_service
 from app.config import settings
 
+# New pipeline imports
+from app.service.processing import BackgroundRemovalPipeline, ModelType
+from app.service.processing.config import PipelineConfig
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -31,6 +35,9 @@ bg_removal_service = None
 bg_removal_service_rmbg = None
 bg_removal_service_rmbg_local = None
 style_processor = None
+
+# Pipeline instance (singleton)
+_pipeline = None
 
 
 def get_bg_removal_service():
@@ -84,6 +91,38 @@ def get_bg_removal_service():
     return bg_removal_service, "u2net"
 
 
+def get_pipeline() -> BackgroundRemovalPipeline:
+    """
+    Get or create pipeline instance
+    Uses new pipeline architecture if enabled in settings
+    """
+    global _pipeline
+    
+    if not settings.pipeline_enabled:
+        return None
+    
+    if _pipeline is None:
+        logger.info("Initializing BackgroundRemovalPipeline...")
+        
+        # Create config from settings
+        config = PipelineConfig(
+            default_model=settings.pipeline_default_model,
+            fallback_enabled=settings.pipeline_fallback_enabled,
+            fallback_chain=settings.pipeline_fallback_chain.split(','),
+            batch_size=settings.pipeline_batch_size,
+            timeout=settings.pipeline_timeout,
+            max_retries=settings.pipeline_max_retries,
+            device=settings.bg_removal_device,
+            local_model_path=settings.bg_removal_local_model_path,
+            collect_metrics=settings.pipeline_collect_metrics,
+        )
+        
+        _pipeline = BackgroundRemovalPipeline(config)
+        logger.info(f"Pipeline initialized with model: {config.default_model}")
+    
+    return _pipeline
+
+
 def get_style_processor() -> StyleProcessor:
     """Get or create style processor instance"""
     global style_processor
@@ -133,23 +172,38 @@ async def remove_background(
         logger.info(f"Processing image: {file.filename}, size: {image.size}, mode: {image.mode}")
         logger.info(f"Options: ratio={ratio}, style={style}, response_format={response_format}")
         
-        # Get services
-        bg_service, model_name = get_bg_removal_service()
-        logger.info(f"Using background removal model: {model_name}")
+        # Get services - Use pipeline if enabled
+        pipeline = get_pipeline()
         
         # 1. Remove background
         step_start = time.time()
-        try:
-            result = await bg_service.remove_background(image)
-        except Exception as e:
-            if settings.bg_removal_fallback and model_name.startswith("rmbg-2.0"):
-                logger.warning(f"RMBG-2.0 failed: {e}. Falling back to U2-Net.")
-                # Fallback to U2-Net
-                fallback_service = BackgroundRemovalService()
-                result = await fallback_service.remove_background(image)
-                model_name = "u2net (fallback)"
-            else:
-                raise
+        if pipeline:
+            # Use new pipeline
+            logger.info("Using pipeline for background removal")
+            processing_result = await pipeline.process(image, use_fallback=True)
+            
+            if not processing_result.success:
+                raise Exception(f"Pipeline processing failed: {processing_result.error}")
+            
+            result = processing_result.image
+            model_name = processing_result.model_used.value if processing_result.model_used else "unknown"
+        else:
+            # Use legacy service
+            bg_service, model_name = get_bg_removal_service()
+            logger.info(f"Using legacy background removal model: {model_name}")
+            
+            try:
+                result = await bg_service.remove_background(image)
+            except Exception as e:
+                if settings.bg_removal_fallback and model_name.startswith("rmbg-2.0"):
+                    logger.warning(f"RMBG-2.0 failed: {e}. Falling back to U2-Net.")
+                    # Fallback to U2-Net
+                    fallback_service = BackgroundRemovalService()
+                    result = await fallback_service.remove_background(image)
+                    model_name = "u2net (fallback)"
+                else:
+                    raise
+        
         timing['background_removal'] = time.time() - step_start
         
         # 2. Apply style processing
@@ -256,24 +310,165 @@ async def get_image_metadata(file: UploadFile = File(...)):
 async def health_check():
     """Health check endpoint for image processing service"""
     try:
-        service, model_name = get_bg_removal_service()
+        # Check both legacy and pipeline
+        pipeline = get_pipeline()
         
-        health_info = {
-            "status": "healthy",
-            "model_name": model_name,
-            "model_loaded": True,
-            "styles_available": ["minimal", "mood", "street"]
-        }
-        
-        # Add GPU info if using RMBG-2.0
-        if model_name == "rmbg-2.0" and hasattr(service, 'get_model_info'):
-            model_info = service.get_model_info()
-            health_info.update(model_info)
-        
-        return health_info
+        if pipeline:
+            # Use pipeline status
+            status = pipeline.get_status()
+            return {
+                "status": "healthy",
+                "mode": "pipeline",
+                **status
+            }
+        else:
+            # Use legacy service
+            service, model_name = get_bg_removal_service()
+            
+            health_info = {
+                "status": "healthy",
+                "mode": "legacy",
+                "model_name": model_name,
+                "model_loaded": True,
+                "styles_available": ["minimal", "mood", "street"]
+            }
+            
+            # Add GPU info if using RMBG-2.0
+            if model_name == "rmbg-2.0" and hasattr(service, 'get_model_info'):
+                model_info = service.get_model_info()
+                health_info.update(model_info)
+            
+            return health_info
         
     except Exception as e:
         return {
             "status": "unhealthy",
             "error": str(e)
         }
+
+
+# New Pipeline Endpoints
+
+@router.get("/pipeline/status")
+async def get_pipeline_status():
+    """
+    Get pipeline status and configuration
+    
+    Returns:
+        Pipeline status including model health and metrics
+    """
+    pipeline = get_pipeline()
+    
+    if not pipeline:
+        return {
+            "enabled": False,
+            "message": "Pipeline is disabled. Using legacy services."
+        }
+    
+    return {
+        "enabled": True,
+        **pipeline.get_status()
+    }
+
+
+@router.get("/pipeline/metrics")
+async def get_pipeline_metrics():
+    """
+    Get pipeline processing metrics
+    
+    Returns:
+        Processing statistics and metrics
+    """
+    pipeline = get_pipeline()
+    
+    if not pipeline:
+        raise HTTPException(
+            status_code=404,
+            detail="Pipeline is not enabled"
+        )
+    
+    return pipeline.get_metrics()
+
+
+@router.get("/models")
+async def list_available_models():
+    """
+    List all available background removal models
+    
+    Returns:
+        List of available models with their status
+    """
+    pipeline = get_pipeline()
+    
+    if not pipeline:
+        # Legacy mode - return configured models
+        return {
+            "mode": "legacy",
+            "available_models": ["u2net", "rmbg-2.0-api", "rmbg-2.0-local"],
+            "current_model": settings.bg_removal_model
+        }
+    
+    # Pipeline mode - return model health status
+    models_status = pipeline.factory.get_all_health_status()
+    current_model = settings.pipeline_default_model
+    
+    return {
+        "mode": "pipeline",
+        "current_model": current_model,
+        "models": models_status,
+        "fallback_enabled": settings.pipeline_fallback_enabled,
+        "fallback_chain": settings.pipeline_fallback_chain.split(',')
+    }
+
+
+@router.post("/models/test/{model_type}")
+async def test_model(model_type: str, file: UploadFile = File(...)):
+    """
+    Test a specific model with an image
+    
+    Args:
+        model_type: Model to test (u2net, rmbg-2.0-local, rmbg-2.0-api)
+        file: Test image file
+        
+    Returns:
+        Test result with processing time and model info
+    """
+    pipeline = get_pipeline()
+    
+    if not pipeline:
+        raise HTTPException(
+            status_code=404,
+            detail="Pipeline is not enabled. Cannot test models."
+        )
+    
+    try:
+        # Validate model type
+        try:
+            model_enum = ModelType(model_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid model type: {model_type}. Available: {[m.value for m in ModelType]}"
+            )
+        
+        # Load image
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+        
+        # Process with specific model
+        result = await pipeline.process(image, model_type=model_enum, use_fallback=False)
+        
+        return {
+            "model_type": model_type,
+            "success": result.success,
+            "processing_time": result.processing_time,
+            "error": result.error,
+            "metadata": result.metadata
+        }
+        
+    except Exception as e:
+        logger.error(f"Error testing model {model_type}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error testing model: {str(e)}"
+        )

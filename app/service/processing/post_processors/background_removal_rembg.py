@@ -1,20 +1,29 @@
 """
 Background Removal Service using rembg
-Fallback implementation that doesn't require Hugging Face authentication
+rembg 라이브러리를 사용한 간단한 배경 제거 대체 구현
 """
 from typing import List
 from PIL import Image
 import logging
-from rembg import remove
 
 logger = logging.getLogger(__name__)
 
+try:
+    from rembg import remove
+    REMBG_AVAILABLE = True
+except ImportError:
+    REMBG_AVAILABLE = False
+    logger.warning("rembg package not installed. Install with: pip install rembg")
 
-class BackgroundRemovalService:
+
+class BackgroundRemovalRembg:
     """Service for AI-powered background removal using rembg"""
     
     def __init__(self):
         """Initialize the background removal service"""
+        if not REMBG_AVAILABLE:
+            raise ImportError("rembg package is required. Install with: pip install rembg")
+        
         logger.info("Initializing rembg background removal service")
         self.model_name = "rembg (u2net)"
     
@@ -35,15 +44,8 @@ class BackgroundRemovalService:
             
             original_size = image.size
             
-            # Run rembg with enhanced post-processing
-            result = remove(
-                image,
-                alpha_matting=True,  # Enable alpha matting for better edges
-                alpha_matting_foreground_threshold=240,
-                alpha_matting_background_threshold=10,
-                alpha_matting_erode_size=10,
-                post_process_mask=True  # Enable mask refinement
-            )
+            # Run rembg
+            result = remove(image)
             
             logger.info(f"Background removed successfully for image size: {original_size}")
             return result

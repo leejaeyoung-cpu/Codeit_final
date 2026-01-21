@@ -45,29 +45,20 @@ class BackgroundRemovalServiceRMBGLocal:
         
         # Load model
         try:
-            logger.info(f"Loading model from: {self.model_path}")
+            logger.info(f"Loading RMBG-2.0 model...")
             
-            # Try loading from local path first
-            if os.path.exists(self.model_path):
-                logger.info("Loading from local path...")
-                self.model = AutoModelForImageSegmentation.from_pretrained(
-                    self.model_path,
-                    trust_remote_code=True,
-                    local_files_only=True
-                )
-            else:
-                logger.info("Local model not found, downloading from Hugging Face...")
-                self.model = AutoModelForImageSegmentation.from_pretrained(
-                    self.model_name,
-                    trust_remote_code=True,
-                    cache_dir=self.model_path
-                )
-                logger.info(f"Model downloaded to: {self.model_path}")
+            # Load directly from HuggingFace (caching handled automatically)
+            logger.info("Loading from HuggingFace Hub...")
+            self.model = AutoModelForImageSegmentation.from_pretrained(
+                self.model_name,
+                trust_remote_code=True
+            )
+            logger.info("Model loaded from HuggingFace successfully")
             
             self.model.to(self.device)
             self.model.eval()
             
-            logger.info("RMBG-2.0 local model loaded successfully")
+            logger.info(f"RMBG-2.0 model ready on device: {self.device}")
             
             # Define image transforms
             self.transform_image = transforms.Compose([
@@ -77,7 +68,7 @@ class BackgroundRemovalServiceRMBGLocal:
             ])
             
         except Exception as e:
-            logger.error(f"Error loading RMBG-2.0 local model: {e}")
+            logger.error(f"Error loading RMBG-2.0 model: {e}")
             raise
     
     def preprocess_image(self, image: Image.Image) -> tuple:
