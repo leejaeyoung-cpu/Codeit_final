@@ -34,6 +34,9 @@ google-cloud-storage==2.10.0
 httpx==0.25.2
 requests==2.31.0
 
+# AdGen_AI Integration (Background Generation & Vision)
+replicate>=0.20.0  # Replicate API client for SDXL background generation
+
 # Utilities
 python-dotenv==1.0.0
 python-jose[cryptography]==3.3.0
